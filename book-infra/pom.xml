@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.booklibrary</groupId>
+  <artifactId>book-infra</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <!-- Keep CDK library versions in sync -->
+    <cdk.version>2.170.0</cdk.version>
+    <constructs.version>10.4.2</constructs.version>
+  </properties>
+
+  <dependencies>
+
+    <!-- AWS CDK core library.
+         Every CDK construct (Stack, App, CfnOutput, Tags, etc.)
+         comes from this dependency. -->
+    <dependency>
+      <groupId>software.amazon.awscdk</groupId>
+      <artifactId>aws-cdk-lib</artifactId>
+      <version>${cdk.version}</version>
+    </dependency>
+
+    <!-- Constructs library.
+         The base class for all CDK constructs lives here.
+         CDK requires this to be compatible with the CDK version. -->
+    <dependency>
+      <groupId>software.constructs</groupId>
+      <artifactId>constructs</artifactId>
+      <version>${constructs.version}</version>
+    </dependency>
+      <dependency>
+          <groupId>org.projectlombok</groupId>
+          <artifactId>lombok</artifactId>
+          <version>1.18.30</version>
+          <scope>provided</scope>
+      </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Maven Exec Plugin.
+           CDK uses this to run the Java app that synthesizes
+           your stacks into CloudFormation templates.
+           The command "cdk synth" triggers:
+             mvn -q compile exec:java -Dexec.mainClass=com.booklibrary.BookLibraryApp -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <mainClass>com.booklibrary.BookLibraryApp</mainClass>
+        </configuration>
+      </plugin>
+
+      <!-- Spotless — code formatter.
+           Commands:
+             mvn spotless:apply  → auto-formats all Java files
+             mvn spotless:check  → fails build if any file is unformatted (use in CI)
+           What it does:
+             - Google Java Format: standardises indentation, braces, line length
+             - Remove unused imports: cleans up imports not referenced in code
+             - Import order: static imports first, then java.*, then everything else -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <java>
+            <googleJavaFormat>
+              <version>1.19.1</version>
+              <style>GOOGLE</style>
+              <reflowLongStrings>true</reflowLongStrings>
+            </googleJavaFormat>
+            <removeUnusedImports/>
+            <importOrder>
+              <order>,java,javax</order>
+            </importOrder>
+          </java>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

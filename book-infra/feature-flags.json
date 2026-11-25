@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "flags": {
+    "enableCreateBook": { "name": "enableCreateBook" },
+    "enableDeleteBook": { "name": "enableDeleteBook" },
+    "enableListFilter": { "name": "enableListFilter" }
+  },
+  "values": {
+    "enableCreateBook": { "enabled": true },
+    "enableDeleteBook": { "enabled": true },
+    "enableListFilter": { "enabled": true }
+  }
+}

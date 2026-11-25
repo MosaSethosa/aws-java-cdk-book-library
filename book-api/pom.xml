@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.4.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.booklibrary</groupId>
+  <artifactId>book-api</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <java.version>21</java.version>
+    <!-- AWS Serverless Java Container adapts Spring Boot to run on Lambda -->
+    <aws.serverless.container.version>2.0.0</aws.serverless.container.version>
+    <!-- AWS SDK v2 for Secrets Manager -->
+    <aws.sdk.version>2.29.0</aws.sdk.version>
+  </properties>
+
+  <dependencies>
+
+    <!-- ─────────────────────────────────────────────────────────
+         Spring Boot Web — REST controllers, Jackson JSON
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         Spring Data JPA — repositories and ORM (Hibernate under the hood)
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         PostgreSQL JDBC Driver — connects Spring Boot to RDS
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         AWS Serverless Java Container — Spring Boot edition.
+         This library wraps your Spring Boot app so Lambda can invoke it.
+         It converts Lambda's APIGatewayProxyRequestEvent into a servlet
+         request that Spring Boot understands.
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>com.amazonaws.serverless</groupId>
+      <artifactId>aws-serverless-java-container-springboot3</artifactId>
+      <version>${aws.serverless.container.version}</version>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         AWS SDK v2 — Secrets Manager client
+         Used to fetch DB credentials from Secrets Manager at startup
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>secretsmanager</artifactId>
+      <version>${aws.sdk.version}</version>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         Validation — @NotBlank, @NotNull on request bodies
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         OpenAPI annotations (@ApiResponse etc.) used on BookController
+         to document error responses. Annotations only — no runtime
+         behaviour. Version matches the swagger-core that springdoc
+         2.7.0 uses.
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations-jakarta</artifactId>
+      <version>2.2.25</version>
+    </dependency>
+
+    <!-- ─────────────────────────────────────────────────────────
+         OpenAPI spec generation (build time only)
+
+         All three are test-scoped, so none of them end up in the
+         Lambda JAR. During `mvn package`, OpenApiSpecGeneratorTest
+         starts the app against H2, asks springdoc for the spec it
+         builds from BookController + Book, and writes it to
+         target/openapi.json. book-infra's ApiStack reads that file
+         to define API Gateway.
+    ───────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+      <version>2.7.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- In-memory database so the app can start without RDS -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Spring Boot Maven Plugin — only used to run locally.
+           We exclude the repackage phase so it doesn't produce
+           Spring Boot's nested BOOT-INF layout, which Lambda's
+           classloader cannot read. maven-shade-plugin handles packaging. -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>repackage</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Maven Shade Plugin — produces a true flat JAR.
+           All classes (yours + all dependencies) are at the root
+           of the JAR so Lambda's classloader can find them directly. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <!-- Exclude signature files that cause SecurityException
+                       when multiple JARs are merged into one -->
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ───────────────────────────────────────────────────────
+           Spotless — code formatter.
+           Enforces consistent style across the codebase.
+
+           Commands:
+             mvn spotless:apply   → auto-formats all Java files
+             mvn spotless:check   → fails the build if any file is unformatted
+                                    (useful in CI pipelines)
+
+           What it does:
+             - Google Java Format: standardises indentation, braces, line length
+             - Remove unused imports: cleans up any imports not referenced in code
+             - Import order: static imports first, then java.*, then everything else
+      ─────────────────────────────────────────────────────────── -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <java>
+
+            <!-- Google Java Format — reformats code to Google style guide -->
+            <googleJavaFormat>
+              <version>1.19.1</version>
+              <style>GOOGLE</style>         <!-- GOOGLE (2-space indent) or AOSP (4-space) -->
+              <reflowLongStrings>true</reflowLongStrings>
+            </googleJavaFormat>
+
+            <!-- Remove any imports that are not used in the file -->
+            <removeUnusedImports/>
+
+            <!-- Import order:
+                 1. Static imports  (e.g. import static org.junit.Assert.*)
+                 2. java.*          (core Java)
+                 3. javax.*         (Java extensions)
+                 4. Everything else (third-party: Spring, AWS SDK, etc.)
+            -->
+            <importOrder>
+              <order>,java,javax</order>
+            </importOrder>
+
+          </java>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>
